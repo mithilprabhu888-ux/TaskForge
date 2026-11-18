@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>TaskForge | MCP task agent</title>
+    <style>
+        :root {
+            --accent: #f59e0b;
+            --accent-2: #10b981;
+            --bg: #0c0e12;
+            --card: #16181f;
+            --muted: #9aa0ab
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0
+        }
+
+        body {
+            font-family: Inter, system-ui, sans-serif;
+            background: var(--bg);
+            color: #f3f3f5;
+            height: 100vh;
+            display: flex;
+            overflow: hidden
+        }
+
+        .chatpane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0
+        }
+
+        header {
+            height: 66px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 0 22px;
+            border-bottom: 1px solid #22252e;
+            flex-shrink: 0
+        }
+
+        .logo {
+            width: 38px;
+            height: 38px;
+            border-radius: 11px;
+            background: linear-gradient(135deg, #f59e0b, #ef4444);
+            display: grid;
+            place-items: center;
+            font-size: 18px
+        }
+
+        header h1 {
+            font-size: 18px
+        }
+
+        header p {
+            font-size: 12px;
+            color: var(--muted)
+        }
+
+        header .badge {
+            margin-left: auto;
+            font-size: 11px;
+            color: var(--muted);
+            border: 1px solid #2a2d37;
+            padding: 4px 10px;
+            border-radius: 8px
+        }
+
+        .chat {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px
+        }
+
+        .chat::-webkit-scrollbar {
+            width: 8px
+        }
+
+        .chat::-webkit-scrollbar-thumb {
+            background: #262a33;
+            border-radius: 8px
+        }
+
+        .empty {
+            margin: auto;
+            text-align: center;
+            color: var(--muted);
+            max-width: 460px
+        }
+
+        .empty .big {
+            font-size: 42px;
+            margin-bottom: 10px
+        }
+
+        .empty h2 {
+            color: #e7e7ec;
+            font-size: 20px;
+            margin-bottom: 8px
+        }
+
+        .empty p {
+            font-size: 14px;
+            line-height: 1.6
+        }
+
+        .row {
+            display: flex;
+            gap: 10px;
+            max-width: 88%
+        }
+
+        .row.user {
+            align-self: flex-end;
+            flex-direction: row-reverse
+        }
+
+        .avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
+            display: grid;
+            place-items: center;
+            font-size: 15px;
+            flex-shrink: 0
+        }
+
+        .row.ai .avatar {
+            background: linear-gradient(135deg, #f59e0b, #ef4444)
+        }
+
+        .row.user .avatar {
+            background: #23262f
+        }
+
+        .stack {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+            min-width: 0
+        }
+
+        .bubble {
+            padding: 12px 16px;
+            border-radius: 16px;
+            font-size: 14.5px;
+            line-height: 1.6;
+            overflow-wrap: break-word
+        }
+
+        .row.ai .bubble {
+            background: var(--card);
+            border: 1px solid #23262f;
+            border-top-left-radius: 5px
+        }
+
+        .row.user .bubble {
+            background: rgba(245, 158, 11, .16);
+            border: 1px solid rgba(245, 158, 11, .35);
+            border-top-right-radius: 5px
+        }
+
+        /* tool trace cards */
+
+        .trace {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            font-size: 12.5px;
+            color: #cbd0d9;
+            background: #121419;
+            border: 1px solid #23262f;
+            padding: 8px 12px;
+            border-radius: 11px;
+            width: fit-content;
+            max-width: 100%
+        }
+
+        .trace .icon {
+            font-size: 14px
+        }
+
+        .trace code {
+            color: var(--accent);
+            font-family: Consolas, monospace;
+            font-size: 12px
+        }
+
+        .trace .args {
+            color: var(--muted);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 380px
+        }
+
+        .trace.result {
+            border-color: rgba(16, 185, 129, .35)
+        }
+
+        .trace.result code {
+            color: var(--accent-2)
+        }
+
+        .trace.status {
+            color: var(--muted);
+            border-style: dashed;
+            background: transparent
+        }
+
+        .trace.error {
+            border-color: rgba(239, 68, 68, .4);
+            color: #ff9b9b
+        }
+
+        .typing {
+            display: inline-flex;
+            gap: 5px;
+            align-items: center;
+            height: 18px
+        }
+
+        .typing span {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #8b8f98;
+            animation: pulse 1.2s infinite ease-in-out
+        }
+
+        .typing span:nth-child(2) {
+            animation-delay: .15s
+        }
+
+        .typing span:nth-child(3) {
+            animation-delay: .3s
+        }
+
+        @keyframes pulse {
+
+            0%,
+            60%,
+            100% {
+                opacity: .3
+            }
+
+            30% {
+                opacity: 1;
+                transform: translateY(-3px)
+            }
+        }
+
+        .composer {
+            padding: 14px 22px 18px;
+            border-top: 1px solid #22252e;
+            flex-shrink: 0
+        }
+
+        .inputbar {
+            display: flex;
+            gap: 10px;
+            background: #121419;
+            border: 1px solid #262a33;
+            border-radius: 14px;
+            padding: 8px 10px
+        }
+
+        .inputbar:focus-within {
+            border-color: rgba(245, 158, 11, .55)
+        }
+
+        #message {
+            flex: 1;
+            background: none;
+            border: none;
+            outline: none;
+            color: #f3f3f5;
+            font-family: inherit;
+            font-size: 14.5px;
+            resize: none;
+            max-height: 120px;
+            padding: 7px 4px
+        }
+
+        .send {
+            background: linear-gradient(135deg, #f59e0b, #ef4444);
+            border: none;
+            color: white;
+            width: 42px;
+            border-radius: 11px;
+            font-size: 16px;
+            cursor: pointer
+        }
+
+        .send:disabled {
+            opacity: .4;
+            cursor: default
+        }
+
+        .hint {
+            font-size: 11.5px;
+            color: #5d626d;
+            margin-top: 8px;
+            text-align: center
+        }
+
+        /* ---------- tasks sidebar ---------- */
+
+        .sidebar {
+            width: 320px;
+            border-left: 1px solid #22252e;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            background: #101218
+        }
+
+        .side-head {
+            padding: 18px 20px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #1d2027
+        }
+
+        .side-head h2 {
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            color: var(--muted)
+        }
+
+        .side-head button {
+            background: none;
+            border: none;
+            color: var(--muted);
+            font-size: 12px;
+            cursor: pointer
+        }
+
+        .side-head button:hover {
+            color: #ff9b9b
+        }
+
+        .tasks {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px
+        }
+
+        .task {
+            background: var(--card);
+            border: 1px solid #23262f;
+            border-radius: 11px;
+            padding: 10px 13px;
+            font-size: 13.5px
+        }
+
+        .task .t {
+            margin-bottom: 4px
+        }
+
+        .task.done .t {
+            text-decoration: line-through;
+            color: var(--muted)
+        }
+
+        .task .meta {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            align-items: center;
+            font-size: 11px;
+            color: var(--muted)
+        }
+
+        .chip {
+            padding: 1px 8px;
+            border-radius: 7px;
+            border: 1px solid #2a2d37
+        }
+
+        .chip.high {
+            color: #ff8f8f;
+            border-color: rgba(239, 68, 68, .4)
+        }
+
+        .chip.medium {
+            color: #ffd280;
+            border-color: rgba(245, 158, 11, .4)
+        }
+
+        .chip.low {
+            color: #9fe0c0;
+            border-color: rgba(16, 185, 129, .4)
+        }
+
+        .chip.due {
+            color: #b9c0ff;
+            border-color: rgba(120, 130, 255, .35)
+        }
+
+        .tasks .placeholder {
+            color: #5d626d;
+            font-size: 12.5px;
+            text-align: center;
+            padding: 24px 10px;
+            line-height: 1.6
+        }
+
+        .tasks::-webkit-scrollbar {
+            width: 8px
+        }
+
+        .tasks::-webkit-scrollbar-thumb {
+            background: #262a33;
+            border-radius: 8px
+        }
+
+        @media (max-width: 900px) {
+            .sidebar {
+                display: none
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="chatpane">
+        <header>
+            <div class="logo">🛠</div>
+            <div>
+                <h1>TaskForge</h1>
+                <p>Task agent powered by MCP</p>
+            </div>
+            <span class="badge">MCP · tool calls visible</span>
+        </header>
+
+        <div class="chat" id="chat">
+            <div class="empty" id="empty">
+                <div class="big">🛠</div>
+                <h2>Talk to your tasks</h2>
+                <p>“Add a high priority task to ship the demo by Friday” —
+                    watch each MCP tool call happen live in the chat, and see
+                    your task list update on the right.</p>
+            </div>
+        </div>
+
+        <div class="composer">
+            <div class="inputbar">
+                <textarea id="message" rows="1"
+                    placeholder="e.g. Create a task: prepare demo, high priority, due 2026-11-20"></textarea>
+                <button class="send" id="send">➤</button>
+            </div>
+            <div class="hint">The agent calls real MCP tools — every call and result appears above the answer</div>
+        </div>
+    </div>
+
+    <aside class="sidebar">
+        <div class="side-head">
+            <h2>Tasks</h2>
+            <button id="refresh">↻ refresh</button>
+        </div>
+        <div class="tasks" id="tasks">
+            <div class="placeholder">Loading tasks…</div>
+        </div>
+    </aside>
+
+    <script>
+        const chat = document.getElementById("chat");
+        const empty = document.getElementById("empty");
+        const messageBox = document.getElementById("message");
+        const sendBtn = document.getElementById("send");
+        const tasksBox = document.getElementById("tasks");
+
+        let busy = false;
+
+        function esc(text) {
+            return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        }
+
+        function addRow(role) {
+            empty.style.display = "none";
+            const row = document.createElement("div");
+            row.className = `row ${role}`;
+            row.innerHTML = `
+                <div class="avatar">${role === "user" ? "🧑" : "🛠"}</div>
+                <div class="stack"></div>`;
+            chat.appendChild(row);
+            chat.scrollTop = chat.scrollHeight;
+            return row.querySelector(".stack");
+        }
+
+        function bubble(stack, html) {
+            const div = document.createElement("div");
+            div.className = "bubble";
+            div.innerHTML = html;
+            stack.appendChild(div);
+            chat.scrollTop = chat.scrollHeight;
+            return div;
+        }
+
+        function traceCard(stack, icon, label, detail, cls) {
+            const div = document.createElement("div");
+            div.className = `trace ${cls || ""}`;
+            const showDetail = detail ? `<span class="args">${esc(detail)}</span>` : "";
+            div.innerHTML = `<span class="icon">${icon}</span><code>${esc(label)}</code>${showDetail}`;
+            stack.appendChild(div);
+            chat.scrollTop = chat.scrollHeight;
+            return div;
+        }
+
+        function typingBubble(stack) {
+            return bubble(stack, `<div class="typing"><span></span><span></span><span></span></div>`);
+        }
+
+        function setBusy(state) {
+            busy = state;
+            sendBtn.disabled = state;
+        }
+
+        // ---------- tasks sidebar ----------
+
+        function parseTasks(text) {
+            // server format: "[✓] #3 Title (priority, status, due X)"
+            const tasks = [];
+            for (const line of (text || "").split("\n")) {
+                const m = line.match(/^\[(.)\] #(\d+) (.+) \((\w+), (\w+)(?:, due ([\d-]+))?\)$/);
+                if (!m) continue;
+                tasks.push({
+                    done: m[1] === "✓",
+                    id: +m[2],
+                    title: m[3],
+                    priority: m[4],
+                    status: m[5],
+                    due: m[6] || null,
+                });
+            }
+            return tasks;
+        }
+
+        async function refreshTasks() {
+            try {
+                const res = await fetch("/api/tasks");
+                const data = await res.json();
+                const tasks = parseTasks(data.text || "");
+                tasksBox.innerHTML = "";
+                if (!tasks.length) {
+                    tasksBox.innerHTML = `<div class="placeholder">No tasks yet.<br>Ask the agent to create one!</div>`;
+                    return;
+                }
+                for (const t of tasks) {
+                    const div = document.createElement("div");
+                    div.className = `task ${t.done ? "done" : ""}`;
+                    div.innerHTML = `
+                        <div class="t">#${t.id} ${esc(t.title)}</div>
+                        <div class="meta">
+                            <span class="chip ${esc(t.priority)}">${esc(t.priority)}</span>
+                            ${t.due ? `<span class="chip due">due ${esc(t.due)}</span>` : ""}
+                            <span>${t.done ? "done ✓" : "pending"}</span>
+                        </div>`;
+                    tasksBox.appendChild(div);
+                }
+            } catch {
+                tasksBox.innerHTML = `<div class="placeholder">Could not reach the MCP server.</div>`;
+            }
+        }
+
+        document.getElementById("refresh").onclick = refreshTasks;
+
+        // ---------- send ----------
+
+        async function send() {
+            const text = messageBox.value.trim();
+            if (!text || busy) return;
+            messageBox.value = "";
+            messageBox.style.height = "auto";
+
+            const userStack = addRow("user");
+            bubble(userStack, esc(text));
+
+            setBusy(true);
+            const aiStack = addRow("ai");
+            const spinner = typingBubble(aiStack);
+            let sawError = false;
+
+            try {
+                const res = await fetch(`/ask/stream?message=${encodeURIComponent(text)}`,
+                    { method: "POST" });
+                if (!res.ok || !res.body) throw new Error(res.status);
+                spinner.remove();
+
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = "";
+                let answerBubble = null;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    // sse-starlette uses \r\n line endings — normalize first
+                    buffer += decoder.decode(value, { stream: true })
+                        .replace(/\r\n/g, "\n");
+                    const parts = buffer.split("\n\n");
+                    buffer = parts.pop();
+                    for (const part of parts) {
+                        if (!part.startsWith("data:")) continue;
+                        const evt = JSON.parse(part.slice(5).trim());
+                        if (evt.type === "status") {
+                            traceCard(aiStack, "⏳", evt.text, "", "status");
+                        } else if (evt.type === "tool_call") {
+                            traceCard(aiStack, "🔧", evt.name,
+                                JSON.stringify(evt.arguments), "");
+                        } else if (evt.type === "tool_result") {
+                            traceCard(aiStack, "✅", evt.name,
+                                evt.result.split("\n")[0], "result");
+                        } else if (evt.type === "text") {
+                            answerBubble = bubble(aiStack, esc(evt.text));
+                        } else if (evt.type === "error") {
+                            sawError = true;
+                            traceCard(aiStack, "⚠️", "error", evt.text, "error");
+                        }
+                    }
+                }
+                refreshTasks();
+                if (!answerBubble && !sawError) {
+                    traceCard(aiStack, "⚠️", "no response",
+                        "The agent returned no answer — check the client logs.",
+                        "error");
+                }
+                if (sawError && !answerBubble) {
+                    /* error already shown */
+                }
+            } catch {
+                spinner.remove();
+                traceCard(aiStack, "⚠️", "error",
+                    "Connection failed. Is the MCP server (8081) and client running?",
+                    "error");
+            }
+            setBusy(false);
+        }
+
+        sendBtn.onclick = send;
+        messageBox.addEventListener("keydown", e => {
+            if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                send();
+            }
+        });
+        messageBox.addEventListener("input", () => {
+            messageBox.style.height = "auto";
+            messageBox.style.height = Math.min(messageBox.scrollHeight, 120) + "px";
+        });
+
+        refreshTasks();
+    </script>
+</body>
+
+</html>
